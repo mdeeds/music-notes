@@ -11,7 +11,6 @@ body {
 /* Styling for the main editable container */
 #editable-area {
   width: 7.5in;
-  max-width: 100%;
   min-height: 300px;
   border: 1px solid #ccc;
   padding: 15px;
@@ -27,26 +26,22 @@ body {
 
 /* Container for each staff (canvases + buttons) */
 .staff-container {
-  position: relative;
   /* For absolute positioning of drawing canvas and buttons */
-  margin: 15px 0;
-  padding-left: 35px;
-  /* Make space for buttons on the left */
+  position: relative;
+  margin: 0 0;
   min-height: 100px;
-  /* Match canvas display height */
-  /* Prevent container from being directly editable, only text around it */
-  user-select: none;
+
   /* Prevent selecting the container itself */
+  user-select: none;
 }
 
 /* Style for BOTH canvases (background lines and foreground drawing) */
 .staff-container canvas {
   display: block;
   border: 1px dashed #eee;
-  background-color: transparent;
   /* Foreground needs transparency */
+  background-color: transparent;
   /* CSS sets the DISPLAY size */
-  max-width: 100%;
   height: 100px;
   /* Default display height */
   width: 100%;
@@ -58,7 +53,7 @@ body {
 canvas.drawing-area {
   position: absolute;
   top: 0;
-  left: 35px;
+  left: 0;
   /* Align with background canvas (due to container padding) */
   cursor: crosshair;
   touch-action: none;
@@ -71,7 +66,9 @@ canvas.drawing-area {
 
 /* Specific style for the background staff lines canvas */
 canvas.staff-lines {
-  position: relative;
+  position: absolute;
+  left: 0;
+  top: 0;
   /* Normal flow within container */
   z-index: 1;
   background-color: white;
@@ -83,7 +80,7 @@ canvas.staff-lines {
 .tool-buttons {
   position: absolute;
   top: 50%;
-  left: 5px;
+  left: -25px;
   /* Position to the left of the canvases */
   transform: translateY(-50%);
   z-index: 3;
