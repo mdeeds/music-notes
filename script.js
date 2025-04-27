@@ -125,7 +125,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- Recalculate Sizes (Important for responsiveness) ---
     const containerPadding = parseFloat(window.getComputedStyle(editableArea).paddingLeft) + parseFloat(window.getComputedStyle(editableArea).paddingRight);
     const availableWidth = editableArea.clientWidth - containerPadding;
-    const displayHeight = 70; // Keep display height consistent
+    const displayHeight = 64; // Keep display height consistent
     const finalDisplayWidth = availableWidth > 100 ? availableWidth : 400;
 
 
@@ -253,9 +253,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function drawStaffLines(canvas, ctx) {
     const numLines = 5;
+    const ledgerSpace = 4;
     const displayHeight = parseFloat(canvas.style.height);
     const displayWidth = parseFloat(canvas.style.width);
-    const lineSpacing = displayHeight / (numLines + 3);
+    const lineSpacing = displayHeight / (numLines + ledgerSpace - 1);
 
     ctx.save();
     ctx.strokeStyle = 'black';
@@ -263,10 +264,10 @@ document.addEventListener('DOMContentLoaded', () => {
     ctx.clearRect(0, 0, displayWidth, displayHeight);
 
     for (let i = 0; i < numLines; i++) {
-      const y = lineSpacing * (i + 1.5);
+      const y = Math.round(lineSpacing * (i + ledgerSpace / 2));
       ctx.beginPath();
-      ctx.moveTo(10, y);
-      ctx.lineTo(displayWidth - 10, y);
+      ctx.moveTo(5, y);
+      ctx.lineTo(displayWidth - 5, y);
       ctx.stroke();
     }
     ctx.restore();
@@ -380,25 +381,10 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     }
 
-    // If cursor is inside a staff container (which is not editable),
-    // we should insert *after* the container.
-    const staffContainerParent = node.nodeType === Node.ELEMENT_NODE ? node : node.parentNode;
-    const closestContainer = staffContainerParent.closest('.staff-container');
-    if (closestContainer && closestContainer.contains(range.startContainer)) {
-      // Insert after the container
-      if (closestContainer.nextSibling) {
-        editableArea.insertBefore(node, closestContainer.nextSibling);
-      } else {
-        editableArea.appendChild(node);
-      }
-      range.setStartAfter(node); // Move cursor after inserted node
-    } else {
-      // Standard insertion at cursor/selection
-      range.deleteContents();
-      range.insertNode(node);
-      range.setStartAfter(node); // Move cursor after inserted node
-    }
-
+    // Standard insertion at cursor/selection
+    range.deleteContents();
+    range.insertNode(node);
+    range.setStartAfter(node); // Move cursor after inserted node
 
     range.collapse(true);
     selection.removeAllRanges();

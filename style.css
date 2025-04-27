@@ -75,10 +75,8 @@ canvas.staff-lines {
 /* Container for the tool buttons */
 .tool-buttons {
   position: absolute;
-  top: 50%;
+  top: 0;
   left: -25px;
-  /* Position to the left of the canvases */
-  transform: translateY(-50%);
   z-index: 3;
   /* Above canvases */
   display: flex;
