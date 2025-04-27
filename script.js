@@ -4,8 +4,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const eraserWidth = 10;
   const pencilWidth = 2;
   const localStorageKeyBase = 'editableMusicNotation_';
-  const contentKey = `${localStorageKeyBase}content`;
-  const canvasDataPrefix = `${localStorageKeyBase}canvas_`;
+  const stateKey = `${localStorageKeyBase}state`;
 
   // --- Utility Functions ---
 
@@ -31,58 +30,45 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Function to save the entire state to localStorage
   const saveState = debounce(() => {
-    console.log("Saving state...");
-    try {
-      // 1. Save main HTML content
-      localStorage.setItem(contentKey, editableArea.innerHTML);
+    const state = {
+      content: editableArea.innerHTML,
+      canvases: {}
+    };
 
-      // 2. Save each canvas drawing
-      const containers = editableArea.querySelectorAll('.staff-container');
-      const currentCanvasKeys = new Set(); // Keep track of canvases currently present
-
-      containers.forEach(container => {
-        const id = container.dataset.id;
-        if (!id) {
-          console.warn("Container found without ID during save:", container);
-          return; // Skip if no ID (shouldn't happen with new containers)
-        }
-        const fgCanvas = container.querySelector('canvas.drawing-area');
-        if (fgCanvas) {
-          const canvasKey = `${canvasDataPrefix}${id}`;
-          currentCanvasKeys.add(canvasKey); // Mark this canvas as present
-          // Use try/catch for toDataURL as it can fail (e.g., tainted canvas)
-          try {
-            const dataUrl = fgCanvas.toDataURL('image/png');
-            localStorage.setItem(canvasKey, dataUrl);
-          } catch (e) {
-            console.error(`Error saving canvas ${id}:`, e);
-          }
-        }
-      });
-
-      // 3. Clean up localStorage for canvases that no longer exist
-      for (let i = 0; i < localStorage.length; i++) {
-        const key = localStorage.key(i);
-        if (key.startsWith(canvasDataPrefix) && !currentCanvasKeys.has(key)) {
-          console.log("Removing orphaned canvas data:", key);
-          localStorage.removeItem(key);
+    const containers = editableArea.querySelectorAll('.staff-container');
+    containers.forEach(container => {
+      const id = container.dataset.id;
+      if (!id) {
+        console.warn("Container found without ID during save:", container);
+        return;
+      }
+      const fgCanvas = container.querySelector('canvas.drawing-area');
+      if (fgCanvas) {
+        try {
+          const dataUrl = fgCanvas.toDataURL('image/png');
+          state.canvases[id] = dataUrl;
+        } catch (e) {
+          console.error(`Error saving canvas ${id}:`, e);
         }
       }
-      console.log("State saved.");
+    });
 
+    try {
+      localStorage.setItem(stateKey, JSON.stringify(state));
     } catch (error) {
       console.error("Error saving state to localStorage:", error);
-      // Handle potential storage quota errors
       if (error.name === 'QuotaExceededError') {
         alert("Could not save changes. Local storage quota might be exceeded. Try removing some staves.");
       }
     }
+
   }, 1000); // Debounce saving by 1 second
 
   // Function to load state from localStorage
   function loadState() {
     console.log("Loading state...");
-    const savedContent = localStorage.getItem(contentKey);
+    const savedState = JSON.parse(localStorage.getItem(stateKey) || '{}');
+    const savedContent = savedState.content;
 
     if (savedContent) {
       editableArea.innerHTML = savedContent;
@@ -90,6 +76,14 @@ document.addEventListener('DOMContentLoaded', () => {
       // Re-initialize all staff containers found in the loaded content
       editableArea.querySelectorAll('.staff-container').forEach(container => {
         initializeStaffContainer(container);
+        const id = container.dataset.id;
+        const fgCanvas = container.querySelector('canvas.drawing-area');
+        const fgCtx = fgCanvas.getContext('2d');
+        const savedImageDataUrl = savedState.canvases[id];
+        if (savedImageDataUrl) {
+          loadImageOntoCanvas(savedImageDataUrl, fgCanvas, fgCtx);
+        }
+
       });
       console.log("State loaded.");
     } else {
@@ -146,30 +140,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const bgCtx = bgCanvas.getContext('2d');
     drawStaffLines(bgCanvas, bgCtx);
 
-    // --- Load and Draw Saved Foreground Image ---
     const fgCtx = fgCanvas.getContext('2d');
-    const savedImageDataUrl = localStorage.getItem(`${canvasDataPrefix}${id}`);
-    if (savedImageDataUrl) {
-      const img = new Image();
-      img.onload = () => {
-        // Draw the loaded image onto the foreground canvas
-        // Ensure context is scaled correctly before drawing
-        fgCtx.save();
-        // Reset transform needed if drawing image directly onto scaled context
-        fgCtx.setTransform(resolutionMultiplier, 0, 0, resolutionMultiplier, 0, 0);
-        fgCtx.drawImage(img, 0, 0, finalDisplayWidth, displayHeight); // Draw using display dimensions
-        fgCtx.restore(); // Restore original scaled transform
-        console.log(`Loaded drawing for canvas ${id}`);
-      };
-      img.onerror = () => {
-        console.error(`Failed to load image data for canvas ${id}`);
-      };
-      img.src = savedImageDataUrl;
-    } else {
-      // If no saved data, ensure canvas is clear
-      fgCtx.clearRect(0, 0, finalDisplayWidth, displayHeight);
-    }
-
+    fgCtx.clearRect(0, 0, finalDisplayWidth, displayHeight);
 
     // --- Re-attach Listeners ---
     addDrawingListeners(fgCanvas, fgCtx, container); // Pass fg canvas, its context, and the container
@@ -228,15 +200,6 @@ document.addEventListener('DOMContentLoaded', () => {
     // Initialize the newly created container (sets sizes, draws lines, adds listeners)
     initializeStaffContainer(container);
 
-    // Add space after insertion
-    const space = document.createTextNode('\u00A0');
-    const br1 = document.createElement('br');
-    const br2 = document.createElement('br');
-    insertNodeAtCursor(br2); // Insert in reverse order to get cursor after last br
-    insertNodeAtCursor(br1);
-    insertNodeAtCursor(space);
-
-
     editableArea.focus();
     saveState(); // Save state immediately after adding a new staff
   });
@@ -250,6 +213,23 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   // --- Helper Functions (Drawing, Insertion, etc.) ---
+  function loadImageOntoCanvas(savedImageDataUrl, fgCanvas, fgCtx) {
+    const img = new Image();
+    img.onload = () => {
+      // Draw the loaded image onto the foreground canvas
+      // Ensure context is scaled correctly before drawing
+      fgCtx.save();
+      // Reset transform needed if drawing image directly onto scaled context
+      fgCtx.setTransform(resolutionMultiplier, 0, 0, resolutionMultiplier, 0, 0);
+      fgCtx.drawImage(img, 0, 0, fgCanvas.width / resolutionMultiplier, fgCanvas.height / resolutionMultiplier); // Draw using display dimensions
+      fgCtx.restore(); // Restore original scaled transform
+      console.log(`Loaded drawing for canvas`);
+    };
+    img.onerror = () => {
+      console.error(`Failed to load image data for canvas`);
+    };
+    img.src = savedImageDataUrl;
+  }
 
   function drawStaffLines(canvas, ctx) {
     const numLines = 5;
@@ -390,21 +370,6 @@ document.addEventListener('DOMContentLoaded', () => {
     selection.removeAllRanges();
     selection.addRange(range);
   }
-
-  // --- Handle window resizing ---
-  // Slightly modified to use initializeStaffContainer for re-setup
-  window.addEventListener('resize', debounce(() => {
-    console.log("Window resize detected, reinitializing containers...");
-    document.querySelectorAll('.staff-container').forEach(container => {
-      // Storing/restoring image data during resize is complex with scaling.
-      // Relying on saved state is simpler for now. Re-init will load from localStorage.
-      // NOTE: This means unsaved drawing changes *during* resize might be lost.
-      // A more robust solution would save state *before* reinitializing.
-      // saveState(); // Optional: Save just before re-initializing (might be slow)
-      initializeStaffContainer(container);
-    });
-  }, 500)); // Debounce resize handling
-
 
   // --- Initial Load ---
   loadState();
