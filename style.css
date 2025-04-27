@@ -29,8 +29,6 @@ body {
   /* For absolute positioning of drawing canvas and buttons */
   position: relative;
   margin: 0 0;
-  min-height: 100px;
-
   /* Prevent selecting the container itself */
   user-select: none;
 }
@@ -41,8 +39,6 @@ body {
   border: 1px dashed #eee;
   /* Foreground needs transparency */
   background-color: transparent;
-  /* CSS sets the DISPLAY size */
-  height: 100px;
   /* Default display height */
   width: 100%;
   /* Take full width of container */

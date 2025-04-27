@@ -125,7 +125,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- Recalculate Sizes (Important for responsiveness) ---
     const containerPadding = parseFloat(window.getComputedStyle(editableArea).paddingLeft) + parseFloat(window.getComputedStyle(editableArea).paddingRight);
     const availableWidth = editableArea.clientWidth - containerPadding;
-    const displayHeight = 100; // Keep display height consistent
+    const displayHeight = 70; // Keep display height consistent
     const finalDisplayWidth = availableWidth > 100 ? availableWidth : 400;
 
 
