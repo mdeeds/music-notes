@@ -124,3 +124,35 @@ p {
   color: #333;
   margin-bottom: 1em;
 }
+
+/* JSON Controls */
+.json-controls {
+  margin-bottom: 15px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  /* Space between elements */
+  flex-wrap: wrap;
+  /* Allow wrapping on smaller screens */
+}
+
+.json-controls textarea {
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 0.8em;
+  padding: 5px;
+  border: 1px solid #ccc;
+  min-height: 40px;
+  /* Adjust as needed */
+  resize: vertical;
+  /* Allow vertical resize */
+  flex-grow: 1;
+  /* Allow textarea to take available space */
+  min-width: 200px;
+  /* Minimum width */
+}
+
+.json-controls button {
+  font-family: 'Courier New', Courier, monospace;
+  padding: 5px 10px;
+  cursor: pointer;
+}

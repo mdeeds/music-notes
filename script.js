@@ -1,6 +1,6 @@
 document.addEventListener('DOMContentLoaded', () => {
   const editableArea = document.getElementById('editable-area');
-  const resolutionMultiplier = 4;
+  const resolutionMultiplier = 2;
   const eraserWidth = 10;
   const pencilWidth = 2;
   const localStorageKeyBase = 'editableMusicNotation_';
@@ -28,8 +28,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // --- State Management ---
 
-  // Function to save the entire state to localStorage
-  const saveState = debounce(() => {
+
+  // Creates the JSON object representing the state of the page.
+  function buildStateObject() {
     const state = {
       content: editableArea.innerHTML,
       canvases: {}
@@ -53,6 +54,12 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     });
 
+    return state;
+  }
+
+  // Function to save the entire state to localStorage
+  const saveState = debounce(() => {
+    const state = buildStateObject();
     try {
       localStorage.setItem(stateKey, JSON.stringify(state));
     } catch (error) {
@@ -64,10 +71,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
   }, 1000); // Debounce saving by 1 second
 
-  // Function to load state from localStorage
-  function loadState() {
-    console.log("Loading state...");
-    const savedState = JSON.parse(localStorage.getItem(stateKey) || '{}');
+
+  function loadStateFromObject(savedState) {
     const savedContent = savedState.content;
 
     if (savedContent) {
@@ -93,6 +98,13 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     // Ensure focus is reasonable after load
     editableArea.focus();
+  }
+
+  // Function to load state from localStorage
+  function loadState() {
+    console.log("Loading state...");
+    const savedState = JSON.parse(localStorage.getItem(stateKey) || '{}');
+    loadStateFromObject(savedState);
   }
 
   // Function to initialize or re-initialize a staff container (used on load and creation)
@@ -174,6 +186,58 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
   // --- Event Listeners Setup ---
+
+  const copyJsonButton = document.getElementById('copy-json-button');
+  copyJsonButton.addEventListener('click', () => {
+    try {
+      const state = buildStateObject();
+      const jsonString = JSON.stringify(state, null, 2); // Pretty print
+
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(jsonString).then(() => {
+          // Provide feedback
+          const originalText = copyJsonButton.textContent;
+          copyJsonButton.textContent = 'Copied!';
+          setTimeout(() => { copyJsonButton.textContent = originalText; }, 2000);
+        }).catch(err => {
+          console.error('Failed to copy JSON to clipboard:', err);
+          alert('Failed to copy JSON. See console for details.');
+          // Fallback: Manually select text in paste area
+          if (pasteJsonArea) {
+            pasteJsonArea.value = jsonString;
+            pasteJsonArea.select();
+            alert("Could not copy automatically. JSON is selected in the text box - please copy it manually (Ctrl+C / Cmd+C).");
+          }
+        });
+      } else {
+        // Fallback for older browsers or insecure contexts
+        if (pasteJsonArea) {
+          pasteJsonArea.value = jsonString;
+          pasteJsonArea.select();
+          alert("Automatic copy not supported. JSON is selected in the text box - please copy it manually (Ctrl+C / Cmd+C).");
+        } else {
+          alert("Clipboard API not available.");
+        }
+      }
+    } catch (error) {
+      console.error("Error generating JSON for copying:", error);
+      alert("Could not generate JSON data. See console for details.");
+    }
+  });
+
+  const pasteJsonArea = document.getElementById('paste-json');
+  const loadJsonButon = document.getElementById('load-json-button');
+  loadJsonButon.addEventListener('click', () => {
+    const jsonString = pasteJsonArea.value;
+    try {
+      const state = JSON.parse(jsonString);
+      loadStateFromObject(state);
+      saveState(); // Save after loading
+    } catch (error) {
+      console.error(error);
+    }
+  });
+
 
   // Listener for creating new staves
   editableArea.addEventListener('dblclick', (event) => {
