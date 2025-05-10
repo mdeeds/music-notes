@@ -5,6 +5,9 @@ document.addEventListener('DOMContentLoaded', () => {
   const pencilWidth = 2;
   const localStorageKeyBase = 'editableMusicNotation_';
   const stateKey = `${localStorageKeyBase}state`;
+  const numStaffLines = 5;
+  const staffLedgerSpace = 4;
+  const staffLineColor = 'black';
 
   // --- Utility Functions ---
 
@@ -118,11 +121,13 @@ document.addEventListener('DOMContentLoaded', () => {
     const bgCanvas = container.querySelector('canvas.staff-lines');
     const fgCanvas = container.querySelector('canvas.drawing-area');
     const buttonContainer = container.querySelector('.tool-buttons');
+
     const writeButton = buttonContainer?.querySelector('button[data-tool="write"]');
+    const noteButton = buttonContainer?.querySelector('button[data-tool="note"]');
     const eraseButton = buttonContainer?.querySelector('button[data-tool="erase"]');
 
-    if (!bgCanvas || !fgCanvas || !buttonContainer || !writeButton || !eraseButton) {
-      console.error("Incomplete staff container structure for ID:", id, container);
+    if (!bgCanvas || !fgCanvas || !buttonContainer || !writeButton || !noteButton || !eraseButton) {
+      console.error("Incomplete staff container structure for ID (missing one or more tool buttons):", id, container);
       // Optionally remove the broken container here
       // container.remove();
       return;
@@ -155,13 +160,15 @@ document.addEventListener('DOMContentLoaded', () => {
     const fgCtx = fgCanvas.getContext('2d');
     fgCtx.clearRect(0, 0, finalDisplayWidth, displayHeight);
 
-    // --- Re-attach Listeners ---
+    // --- Re-attach Listeners and Tool Buttons ---
     addDrawingListeners(fgCanvas, fgCtx, container); // Pass fg canvas, its context, and the container
 
-    // Remove old listeners before adding new ones to prevent duplicates if re-initializing
-    buttonContainer.replaceWith(buttonContainer.cloneNode(true)); // Simple way to remove listeners
-    const newButtonContainer = container.querySelector('.tool-buttons'); // Get the new clone
+    // Clear existing buttons and re-populate
+    buttonContainer.innerHTML = '';
+    populateToolButtons(buttonContainer, container);
+    const newButtonContainer = container.querySelector('.tool-buttons');
     const newWriteButton = newButtonContainer.querySelector('button[data-tool="write"]');
+    const newNoteButton = newButtonContainer.querySelector('button[data-tool="note"]');
     const newEraseButton = newButtonContainer.querySelector('button[data-tool="erase"]');
 
     newButtonContainer.addEventListener('click', (e) => {
@@ -169,7 +176,9 @@ document.addEventListener('DOMContentLoaded', () => {
         const selectedTool = e.target.dataset.tool;
         container.dataset.tool = selectedTool;
         newWriteButton.classList.toggle('active', selectedTool === 'write');
+        newNoteButton.classList.toggle('active', selectedTool === 'note');
         newEraseButton.classList.toggle('active', selectedTool === 'erase');
+
         // No need to save state here, drawing/input events handle it
       }
     });
@@ -178,12 +187,29 @@ document.addEventListener('DOMContentLoaded', () => {
     const currentTool = container.dataset.tool || 'write'; // Default to write if unset
     container.dataset.tool = currentTool; // Ensure dataset is set
     newWriteButton.classList.toggle('active', currentTool === 'write');
+    newNoteButton.classList.toggle('active', currentTool === 'note');
     newEraseButton.classList.toggle('active', currentTool === 'erase');
 
     // Make container non-editable (important after innerHTML replacement)
     container.contentEditable = false;
   }
 
+  function populateToolButtons(buttonContainer, container) {
+    const buttons = [
+      { tool: 'write', title: 'Pencil', text: 'p', active: true },
+      { tool: 'note', title: 'Note', text: 'n', active: false },
+      { tool: 'erase', title: 'Erase', text: 'e', active: false }
+    ];
+
+    buttons.forEach(button => {
+      const buttonElement = document.createElement('button');
+      buttonElement.type = 'button';
+      buttonElement.dataset.tool = button.tool;
+      buttonElement.title = button.title;
+      buttonElement.textContent = button.text;
+      buttonContainer.appendChild(buttonElement);
+    });
+  }
 
   // --- Event Listeners Setup ---
 
@@ -250,14 +276,11 @@ document.addEventListener('DOMContentLoaded', () => {
     container.dataset.id = newId; // Assign ID
     container.dataset.tool = 'write'; // Default tool
 
-    container.innerHTML = `
-          <canvas class="staff-lines"></canvas>
-          <canvas class="drawing-area"></canvas>
-          <div class="tool-buttons">
-              <button type="button" class="active" data-tool="write" title="Write">w</button>
-              <button type="button" data-tool="erase" title="Erase">e</button>
-          </div>
-      `;
+    container.innerHTML = ` <canvas class="staff-lines"></canvas> <canvas class="drawing-area"></canvas> <div class="tool-buttons"></div> `;
+
+    // Populate tool buttons
+    const buttonContainer = container.querySelector('.tool-buttons');
+    populateToolButtons(buttonContainer, container);
 
     // Insert the container structure
     insertNodeAtCursor(container);
@@ -295,20 +318,32 @@ document.addEventListener('DOMContentLoaded', () => {
     img.src = savedImageDataUrl;
   }
 
+  function getLineSpacing(canvas) {
+    const displayHeight = parseFloat(canvas.style.height);
+    return displayHeight / (numStaffLines + staffLedgerSpace);
+  }
+
+  function getStaffLineNumber(y, lineSpacing) {
+    // Round to the nearest 0.5 lines
+    return 0.5 * Math.round(2.0 * (y / lineSpacing - staffLedgerSpace / 2));
+  }
+
+  function getYForStaffLineNumber(staffLineNumber, lineSpacing) {
+    return Math.round(lineSpacing * (staffLineNumber + staffLedgerSpace / 2));
+  }
+
   function drawStaffLines(canvas, ctx) {
-    const numLines = 5;
-    const ledgerSpace = 4;
     const displayHeight = parseFloat(canvas.style.height);
     const displayWidth = parseFloat(canvas.style.width);
-    const lineSpacing = displayHeight / (numLines + ledgerSpace - 1);
+    const lineSpacing = getLineSpacing(canvas);
 
     ctx.save();
-    ctx.strokeStyle = 'black';
+    ctx.strokeStyle = staffLineColor;
     ctx.lineWidth = 1; // Keep line width consistent regardless of multiplier for visual clarity
     ctx.clearRect(0, 0, displayWidth, displayHeight);
 
-    for (let i = 0; i < numLines; i++) {
-      const y = Math.round(lineSpacing * (i + ledgerSpace / 2));
+    for (let i = 0; i < numStaffLines; i++) {
+      const y = getYForStaffLineNumber(i, lineSpacing);
       ctx.beginPath();
       ctx.moveTo(5, y);
       ctx.lineTo(displayWidth - 5, y);
@@ -337,6 +372,22 @@ document.addEventListener('DOMContentLoaded', () => {
       return { x, y };
     }
 
+    function drawNotehead(coords) {
+      const lineSpacing = getLineSpacing(canvas);
+      const staffLine = getStaffLineNumber(coords.y, lineSpacing);
+      const y = getYForStaffLineNumber(staffLine, lineSpacing);
+
+      const minX = Math.min(lastX - 0.6 * lineSpacing, coords.x - 0.6 * lineSpacing);
+      const maxX = Math.max(lastX + 0.6 * lineSpacing, coords.x + 0.6 * lineSpacing);
+      ctx.clearRect(minX, 0, maxX - minX, canvas.height);
+      ctx.fillStyle = 'black';
+      ctx.beginPath();
+      ctx.moveTo(coords.x, y);
+      ctx.ellipse(coords.x, y, 0.6 * lineSpacing, 0.45 * lineSpacing,
+        -20 * Math.PI / 180, 0, 2 * Math.PI);
+      ctx.fill();
+    }
+
     function startDrawing(event) {
       // Prevent drawing if inside a non-editable container but not on the canvas itself
       if (event.target !== canvas) return;
@@ -350,10 +401,12 @@ document.addEventListener('DOMContentLoaded', () => {
       if (currentTool === 'erase') {
         ctx.globalCompositeOperation = 'destination-out';
         ctx.lineWidth = eraserWidth;
-      } else {
+      } else if (currentTool === 'write') {
         ctx.globalCompositeOperation = 'source-over';
         ctx.strokeStyle = 'black';
         ctx.lineWidth = pencilWidth;
+      } else if (currentTool === 'note') {
+        drawNotehead(coords);
       }
 
       ctx.lineCap = 'round';
@@ -362,25 +415,31 @@ document.addEventListener('DOMContentLoaded', () => {
       ctx.moveTo(lastX, lastY);
     }
 
+
     function draw(event) {
+      const currentTool = container.dataset.tool;
       if (!isDrawing) return;
       // Prevent drawing if inside a non-editable container but not on the canvas itself
       if (event.target !== canvas && !(event.touches && event.touches[0].target === canvas)) return;
-
       if (event.touches) event.preventDefault();
 
       const coords = getCoords(event);
-      ctx.lineTo(coords.x, coords.y);
-      ctx.stroke();
+      if (currentTool === 'note') {
+        drawNotehead(coords);
+      } else {
+        ctx.lineTo(coords.x, coords.y);
+        ctx.stroke();
+      }
+
       [lastX, lastY] = [coords.x, coords.y];
     }
 
     function stopDrawing(event) {
       // Check if drawing was actually happening before restoring/saving
+      const currentTool = container.dataset.tool;
       if (!isDrawing) return;
       // Prevent saving if mouse up happens outside the canvas while drawing
       // if (event.target !== canvas && !(event.touches && event.touches.length === 0)) return;
-
 
       isDrawing = false;
       ctx.restore(); // Restore context state (composite op, line width)
